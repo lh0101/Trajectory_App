@@ -1,6 +1,6 @@
 # Projeto PI-7 - Subgrupo de Trajetória e Programação
 
-Este repositório contém os códigos, gramática ANTLR e interpretador relacionados ao **subgrupo de Trajetória** do projeto **PI-7 (PMR3420 - Projeto Integrado 7)** da Escola Politécnica da USP.
+Este repositório contém os códigos, gramática ANTLR, interpretador e Interface relacionados ao **subgrupo de Trajetória** do projeto **PI-7 (PMR3420 - Projeto Integrado 7)** da Escola Politécnica da USP.
 
 ## 📌 Visão Geral
 
@@ -13,19 +13,19 @@ O projeto PI-7 propõe o desenvolvimento de uma máquina com **dois eixos com co
 
 ## 🔧 Estrutura deste Subgrupo
 
-Este repositório trata das **etapas iniciais do processamento do G-code**:
+Este repositório trata das **do processamento do G-code** e também da **Interface e Comunicação** com o microcontrolador:
 
 - Definição da gramática do G-code (`GCode.g4`)
 - Geração de Lexer e Parser via ANTLR
 - Implementação do interpretador e visualizador de trajetória (`GCodeInterpreter.py`)
 - Exportação da trajetória em coordenadas (`x`, `y`) para posterior envio ao Raspberry Pi via protocolo MODBUS
+- Interface de comunicação com o microcontrolador
 
 ## 📂 Arquivos principais
 
 - `GCode.g4`: Gramática ANTLR para interpretação de comandos G-code (G00 a G04, M30)
 - `GCodeInterpreter.py`: Interpretador que realiza interpolação linear e circular, além de preview e exportação da trajetória
-- `main.py`: Script de entrada para execução do parser e do interpretador
-- `programa.gcode`: Exemplo de arquivo G-code para testes
+- `Interface.py`: Script de exibiçao da interface e comunicação com o microcontrolador usando o protocolo MODBUS. 
 
 ## ✅ Comandos G implementados
 
@@ -35,7 +35,7 @@ Este repositório trata das **etapas iniciais do processamento do G-code**:
 | `G01`   | Interpolação linear                  | `X`, `Y`                           |
 | `G02`   | Interpolação circular CW             | `X`, `Y`, `I`, `J`                 |
 | `G03`   | Interpolação circular CCW            | `X`, `Y`, `I`, `J`                 |
-| `G04`   | Pausa (delay)                        | `P` (tempo em milissegundos)      |
+| `G04`   | Pausa (delay)                        | `P` (tempo em milissegundos)       |
 | `M30`   | Fim do programa                      | -                                  |
 
 ### 🧭 Significado dos parâmetros
@@ -47,36 +47,18 @@ Este repositório trata das **etapas iniciais do processamento do G-code**:
 ## 🧰 Requisitos
 
 - Python 3.10+
-- ANTLR 4.13.2
+- ANTLR 4.13.2 (inclusive java e outros requisitos do ANTLR)
 - Pacotes Python:
   - `antlr4-python3-runtime`
   - `numpy`
   - `matplotlib`
+  - `tkinter`
+ 
 
-## ⚙️ Como executar
+## 📈 Comentários sobre o código GCodeInterpreter.py
 
-1. Gere os arquivos do ANTLR:
-
-```bash
-java -jar antlr-4.13.2-complete.jar -Dlanguage=Python3 GCode.g4
-```
-
-2. Execute o interpretador:
-
-```bash
-python main.py
-```
-
-3. A execução:
-
-- Interpreta o G-code
-- Gera um gráfico de preview da trajetória
-- Cria um arquivo `.gif` com a trajetória animada
-
-## 📈 Exemplo de saída
-
-- Preview gráfico: Trajetória em `x` e `y`
-- Arquivo `.gif` salvo automaticamente ao final da execução (`Trajetória.gif` por padrão)
+- Realiza o processamento do Gcode em python e gera a trajetória desejada expondo-a na interface.
+- Outras funções dentro do arquivo estão dormentes e podem ser usadas para criar gifs da trajetória, por exemplo.
 
 ## 🔄 Próximas Etapas
 
