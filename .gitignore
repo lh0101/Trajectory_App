@@ -3,3 +3,23 @@ build
 
 # Ignore MacOS file system related.
 **/*.DS_Store*
+# Imagens e GIFs
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.webp
+*.svg
+
+# Diretórios de cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc~
+
+# Outras pastas temporárias comuns
+*.DS_Store
+Thumbs.db
