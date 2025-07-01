@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 // Drivers for UART, LED and Console(debug)
 //#include <cr_section_macros.h>
@@ -24,6 +25,22 @@
 #include "command_interpreter.h"
 #include "../trj_state/trj_state.h"
 #include "../trj_control/trj_control.h"
+#include "../trj_program/trj_program.h"
+
+
+struct valores_reg val = {
+    .INICIAR   = 0,
+    .SUSPENDER = 0,
+    .CONTINUAR = 0,
+    .ABORTAR   = 0,
+    .JOGX      = 0,
+    .JOGY      = 0,
+    .PASSOX    = 0,
+    .PASSOY    = 0,
+    .X         = 0,
+    .Y         = 0,
+    .LINHA     = 0
+};
 
 // communication with TrajectoryController
 extern xQueueHandle qControlCommands;
@@ -31,6 +48,7 @@ extern xQueueHandle qControlCommands;
 void ctl_init(){
 
   // TODO: implementar
+
 
 } // ctl_init
 
@@ -44,12 +62,26 @@ void ctl_init(){
 *************************************************************************/
 int ctl_ReadRegister(int registerToRead) {
    switch (registerToRead) {
+      case REG_INICIAR: 
+         return val.INICIAR;
+      case REG_SUSPENDER: 
+         return val.SUSPENDER;
+      case REG_ABORTAR: 
+         return val.ABORTAR;
+      case REG_CONTINUAR: 
+         return val.CONTINUAR;
+      case REG_JOGX: 
+         return val.JOGX;
+      case REG_JOGY: 
+         return val.JOGY;
+      case REG_PASSOX: 
+         return val.PASSOX;
+      case REG_PASSOY: 
+         return val.PASSOY;
       case REG_X:
          return (int)tst_getX();
       case REG_Y:
          return (int)tst_getY();
-      case REG_Z:
-         return (int)tst_getZ();
       case REG_LINHA:
          return tst_getCurrentLine();
    } // switch
@@ -68,16 +100,62 @@ int ctl_ReadRegister(int registerToRead) {
     TRUE se escrita foi aceita, FALSE caso contrario.
 *************************************************************************/
 int ctl_WriteRegister(int registerToWrite, int value) {
-  // TODO: implementar
   tcl_Data command;
+
   printf("Register %d Value %d\n", registerToWrite, value);
   switch(registerToWrite) {
-  case REG_START:
+  case REG_INICIAR:
 	  printf("start program\n");
-	  command.command = CMD_START;
+	  command.command = CMD_INICIAR;
+     val.INICIAR = value;
 	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
 	  break;
-  default:
+   case REG_SUSPENDER:
+	  printf("suspend program\n");
+	  command.command = CMD_SUSPENDER;
+     val.SUSPENDER = value;
+	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
+	  break;
+   case REG_CONTINUAR:
+	  printf("continue program\n");
+	  command.command = CMD_CONTINUAR;
+     val.CONTINUAR = value;
+	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
+	  break;
+   case REG_ABORTAR:
+	  printf("abort program\n");
+	  command.command = CMD_ABORTAR;
+     val.ABORTAR = value;
+	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
+	  break;
+     // nao sei se aqui mas em algum momento tem que zerar current line
+   case REG_JOGX:
+	  printf("jogx\n");
+	  command.command = CMD_JOGX;
+     val.JOGX = value;
+	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
+	  break;
+   case REG_JOGY:
+	  printf("jogy\n");
+	  command.command = CMD_JOGY;
+     val.JOGY = value;
+	  xQueueSend(qControlCommands, &command, portMAX_DELAY);
+	  break;
+   case REG_PASSOX:
+	  printf("passox\n");
+     val.PASSOX = value;
+	//   command.command = CMD_JOGY;
+	//   xQueueSend(qControlCommands, &command, portMAX_DELAY);
+   // todo implementar o que fazer com valor de passo
+	  break;
+   case REG_PASSOY:
+	  printf("passoy\n");
+     val.PASSOY = value;
+	//   command.command = CMD_JOGY;
+	//   xQueueSend(qControlCommands, &command, portMAX_DELAY);
+   // todo implementar o que fazer com valor de passo
+	  break;
+   default:
 	  printf("unknown register to write\n");
 	  break;
   } //switch
@@ -94,9 +172,23 @@ int ctl_WriteRegister(int registerToWrite, int value) {
  Retorno:
     TRUE se escrita foi aceita, FALSE caso contrario.
 *************************************************************************/
-int ctl_WriteProgram(byte* program_bytes) {
+int ctl_WriteProgram(int* program_bytes, int totalPoints) {
+   static char texto[1024];
+   texto[0] = '\0';
+   char tmp[64];
+   // --- Monta string para tpr_storeProgram ---
+   
+   printf("[DEBUG] Total de pontos:", totalPoints);
 
-  // TODO: implementar
+   for (int i = 0; i < totalPoints; i++) {
+      int x = program_bytes[i * 2];
+      int y = program_bytes[i * 2 + 1];
+      sprintf(tmp, "X:%d,Y:%d;", x, y);
+      strcat(texto, tmp);
+   }
+
+   printf("[DEBUG] Chamando tpr_storeProgram com texto:\n    %s\n", texto);
+   tpr_storeProgram(texto);
 
   return true; //TRUE;
 } // ctl_WriteRegister

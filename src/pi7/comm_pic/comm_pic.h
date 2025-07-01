@@ -11,7 +11,6 @@
 typedef struct {
 	float setPoint1;
 	float setPoint2;
-	float setPoint3;
 } pic_Data;
 
 void pic_init(void);

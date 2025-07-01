@@ -36,6 +36,7 @@
 #include "pi7/trj_control/trj_control.h"
 #include "pi7/trj_program/trj_program.h"
 #include "pi7/trj_state/trj_state.h"
+#include "pi7/polinomio_pc/polinomio.h"
 
 // PI7 DEFINES
 #define CONTROL_Q_SIZE 1 // queue sizes
@@ -65,7 +66,7 @@ QueueHandle_t qCommDev; // para testes
 void taskController(void *pvParameters) {
   while(1) {
     
-    printf("1"); // [jo:231005] teste
+    // printf("1"); // [jo:231005] teste
 
     com_executeCommunication(); //internally, it calls Controller to process events
     vTaskDelay(DELAY_200MS); // [jo:230929] TODO: por que não tem vTaskDelay() ? -> não, tem espera na fila
@@ -74,7 +75,7 @@ void taskController(void *pvParameters) {
 
 /**
  * taskNCProcessing: processes NC Program. It receives commands from Controller
- * via queue qControlCommands (start/pause/resume/abort)
+ * via queue qControlCommands (start/pause/resume/abort) //jogx/jogy
  * Runs every 200ms (may generate up to 5 new setpoints per second to interpolate trajectory)
  * Note the use of vTaskDelayUntil instead of vTaskDelay; this will cause system to run every 200ms.
  */
@@ -85,7 +86,7 @@ void taskNCProcessing(void *pvParameters) {
   lastWakeTime = xTaskGetTickCount();
   while(1) {
 
-    printf("2"); // [jo:231005] teste
+    // printf("2"); // [jo:231005] teste
 
     data.command = NO_CMD;
     xQueueReceive(qControlCommands, &data, 0); //do not wait for command
@@ -105,15 +106,15 @@ void taskCommPIC(void *pvParameters) {
 	pic_Data setpoints;
 	while(1) {
             
-    //uart_putc_raw(uart0, '3'); // [jo:231004] teste
-    UARTSend(0, (uint8_t*)"3", 1); // [jo:231004] teste
-    UARTSend(1, (uint8_t*)"3", 1); // [jo:231004] teste
-    printf("3"); // [jo:231005] teste
+    // //uart_putc_raw(uart0, '3'); // [jo:231004] teste
+    // UARTSend(0, (uint8_t*)"3", 1); // [jo:231004] teste
+    // UARTSend(1, (uint8_t*)"3", 1); // [jo:231004] teste
+    // // printf("3"); // [jo:231005] teste
 
     xQueueReceive(qCommPIC, &setpoints, pdMS_TO_TICKS(250)); // portMAX_DELAY); // [jo:231004] 250 ms no meu teste
     pic_sendToPIC(0, setpoints);
     pic_sendToPIC(1, setpoints);
-    //vTaskDelay(DELAY_200MS); // [jo:230928] eu coloquei, precisa?
+    // vTaskDelay(2000); // [jo:230928] eu coloquei, precisa?
   } //task loop
 } // taskCommPIC
 
@@ -159,6 +160,7 @@ static void initComponents(void) {
   tcl_init(); // trajectory control
   tst_init(); // trajectory state
   tpr_init(); // trajectory program
+  tpr_initTheta(); // theta trajectory program
 
 } // initComponents
 
@@ -172,52 +174,60 @@ uint8_t msgReadRegister[] = {0x3a, 0x00, 0x00, 0x30, 0x33, 0x00, 0x00, 0x30, 0x3
 uint8_t msgWriteRegister[] = {0x3a, 0x30, 0x31, 0x30, 0x36, 0x30, 0x30, 0x30, 0x30, 0x30, 0x31, 0x30, 0x30, 0x0d, 0x0a};
 
 int main(void) {
-	int i;
-	char ch;
+    int i;
+    char ch;
 
-  // Define task handles
-  TaskHandle_t handleLed; // [jo:230929] no pico w o cyw43 precisa rodar sempre num único core
+    // Define task handles
+    TaskHandle_t handleLed; // [jo:230929] no pico w o cyw43 precisa rodar sempre num único core
 
-	//MB+ init Console(debug)
-	printf("nao apague esta linha\n");
+    // MB+ init Console(debug)
+    printf("nao apague esta linha\n");
+    // → Isso garante que, assim que o Pico subir, você verá no Serial USB:
+    //   “nao apague esta linha”
+    //   e depois:
+    //   “Hardware setup completed.”
 
-	// init hardware
-	setupHardware();
+    // init hardware
+    setupHardware();  
+    // → dentro de setupHardware():
+    //    - led_init();
+    //    - stdio_usb_init();    ← essencial para que o USB-Serial funcione
+    //    - UARTInit(0, UART_BAUD);
+    //    - UARTInit(1, UART_BAUD);
+    //    - printf("Hardware setup completed.\n");
 
-	// init components
-	initComponents(); // init Modbus
+    // init components
+    initComponents();  // init Modbus → chama com_init()
 
-	/* 
-	 * Start the tasks defined within this file/specific to this demo. 
-	 */
-	xTaskCreate( taskBlinkLed, "BlinkLed", USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, &handleLed);
-	xTaskCreate( taskController, "Controller", USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
-	xTaskCreate( taskNCProcessing, "NCProcessing", USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
-	xTaskCreate( taskCommPIC, "CommPIC", USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
+    /* 
+     * Start the tasks defined within this file/specific to this demo. 
+     */
+    xTaskCreate(taskBlinkLed,     "BlinkLed",    USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, &handleLed);
+    xTaskCreate(taskController,   "Controller",  USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(taskNCProcessing, "NCProcessing",USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(taskCommPIC,      "CommPIC",     USERTASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
-  vTaskCoreAffinitySet(handleLed, (1 << 0)); // executa BlinkLed num único core
+    vTaskCoreAffinitySet(handleLed, (1 << 0)); // executa BlinkLed num único core
 
-	//*************** DEBUG FOR ReadRegister
-	// insert ReadRegister msg on qCommDev for debug
-	// for (i=0; i<sizeof(msgReadRegister); i++) {
-	//   ch = msgReadRegister[i];
-  // 	xQueueSend(qCommDev, &ch, portMAX_DELAY);
-	// }
-	
-  // ************** DEBUG FOR WriteRegister
-	// insert WriteRegister msg on qCommDev for debug
-	// for (i=0; i<sizeof(msgWriteRegister); i++) {
-	//   ch = msgWriteRegister[i];
-  // 	xQueueSend(qCommDev, &ch, portMAX_DELAY);
-	// }
-	
-	/* 
-	 * Start the scheduler. 
-	 */
-	vTaskStartScheduler();
+    //*************** DEBUG FOR ReadRegister
+    // for (i=0; i<sizeof(msgReadRegister); i++) {
+    //   ch = msgReadRegister[i];
+    //   xQueueSend(qCommDev, &ch, portMAX_DELAY);
+    // }
 
-	/* 
-	 * Will only get here if there was insufficient memory to create the idle task. 
-	 */
-	return 1;
+    // ************** DEBUG FOR WriteRegister
+    // for (i=0; i<sizeof(msgWriteRegister); i++) {
+    //   ch = msgWriteRegister[i];
+    //   xQueueSend(qCommDev, &ch, portMAX_DELAY);
+    // }
+
+    /* 
+     * Start the scheduler. 
+     */
+    vTaskStartScheduler();
+
+    /* 
+     * Will only get here if there was insufficient memory to create the idle task. 
+     */
+    return 1;
 } // main
