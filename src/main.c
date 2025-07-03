@@ -94,7 +94,7 @@ void taskNCProcessing(void *pvParameters) {
       tcl_processCommand(data);
     }
     tcl_generateSetpoint();
-    vTaskDelayUntil(&lastWakeTime, DELAY_200MS);
+    vTaskDelayUntil(&lastWakeTime, 1500);
   } //task loop
 } // taskNCProcessing
 
@@ -112,8 +112,10 @@ void taskCommPIC(void *pvParameters) {
     // // printf("3"); // [jo:231005] teste
 
     xQueueReceive(qCommPIC, &setpoints, pdMS_TO_TICKS(250)); // portMAX_DELAY); // [jo:231004] 250 ms no meu teste
-    pic_sendToPIC(0, setpoints);
-    pic_sendToPIC(1, setpoints);
+    pic_sendToPIC(setpoints);
+    vTaskDelay(1000);
+    // sendCommandByteByByte(0, ":ah;");
+    // sendCommandByteByByte(1, ":ah;");
     // vTaskDelay(2000); // [jo:230928] eu coloquei, precisa?
   } //task loop
 } // taskCommPIC

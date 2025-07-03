@@ -23,6 +23,8 @@
 // local variables
 int tcl_status;
 extern xQueueHandle qCommPIC;
+float arrJogx[4];
+float arrJogy[4];
 
 void tcl_generateSetpoint() {
 
@@ -36,11 +38,12 @@ void tcl_generateSetpoint() {
 
   if (tcl_status == STATUS_RUNNING) {
     currLine = tst_getCurrentLine();
-    theta1 = 100*tpr_getLineTheta1(currLine).theta;
-    theta2 = 100*tpr_getLineTheta2(currLine).theta;
+    theta1 = 10*tpr_getLineTheta1(currLine).theta;
+    theta2 = 10*tpr_getLineTheta2(currLine).theta;
     toPic.setPoint1 = theta1;
     toPic.setPoint2 = theta2;
-    // printf("CurrLine %d, X1:%d\n", currLine, line.x);
+    printf("[DEBUG] Enviando Theta: %d para uart %d", theta1, 0);
+    printf("[DEBUG] Enviando Theta: %d para uart %d", theta2, 1);   
     xQueueSend(qCommPIC, &toPic, portMAX_DELAY);
     currLine++;
     tst_setCurrentLine(currLine);
@@ -55,10 +58,18 @@ void tcl_generateSetpoint() {
     line = tpr_getLine(currLine);
     float passox = ctl_ReadRegister(7);
     if (ctl_ReadRegister(5) == -1){
-      passox = -passox; ///// criar funcao
+      passox = -passox; 
     }
     xj = line.x + passox;
-    yj = line.y ; ///// criar funcao
+    yj = line.y ; 
+    // adicao para tranformar em theta
+    // arrJogx[0] = line.x;
+    // arrJogx[1] = yj;
+    // arrJogx[2] = xj;
+    // arrJogx[3] = yj;
+    // trajetoriaTheta(arrJogx, 4);
+    //necessário achar um jeito de passar essa sequencia de 2 pontos pelo interpolador para gerar uma unica interpolacao
+    // fim da trasnformacao em theta
     toPic.setPoint1 = xj;
     toPic.setPoint2 = yj;
     xQueueSend(qCommPIC, &toPic, portMAX_DELAY);
@@ -73,16 +84,37 @@ void tcl_generateSetpoint() {
     line = tpr_getLine(currLine);
     float passoy = ctl_ReadRegister(8);
     if (ctl_ReadRegister(6) == -1){
-      passoy = -passoy; ///// criar funcao
+      passoy = -passoy; 
     }
     xj = line.x;
-    yj = line.y + passoy; ///// criar funcao
+    yj = line.y + passoy;
+    // adicao para tranformar em theta
+    // arrJogy[0] = xj;
+    // arrJogy[1] = line.y;
+    // arrJogy[2] = xj;
+    // arrJogy[3] = yj
+    // trajetoriaTheta(arrJogy, 4) 
+    //necessário achar um jeito de passar essa sequencia de 2 pontos pelo interpolador para gerar uma unica interpolacao
+    // fim da trasnformacao em theta
     toPic.setPoint1 = xj;
     toPic.setPoint2 = yj;
     xQueueSend(qCommPIC, &toPic, portMAX_DELAY);
     return;
   }
 
+  // if (tcl_status == STATUS_RUNNING) {
+  //   currLine = tst_getCurrentLine();
+  //   theta1 = 100*tpr_getLineTheta1(currLine).theta;
+  //   theta2 = 100*tpr_getLineTheta2(currLine).theta;
+  //   toPic.setPoint1 = theta1;
+  //   toPic.setPoint2 = theta2;
+  //   printf("[DEBUG] Enviando Theta: %d para uart %d", theta1, 0);
+  //   printf("[DEBUG] Enviando Theta: %d para uart %d", theta2, 1);
+  //   xQueueSend(qCommPIC, &toPic, portMAX_DELAY);
+  //   currLine++;
+  //   tst_setCurrentLine(currLine);
+  //   return;
+  // }
   else {
     return;
   }
@@ -92,8 +124,14 @@ void tcl_generateSetpoint() {
 
 void tcl_processCommand(tcl_Data data) {
 
-  if ((data.command == CMD_SUSPENDER) || (data.command == CMD_ABORTAR)) {
+  if (data.command == CMD_SUSPENDER) {
     tcl_status = STATUS_NOT_RUNNING;
+  }
+
+  if (data.command == CMD_ABORTAR) {
+    tcl_status = STATUS_NOT_RUNNING;
+    tst_setCurrentLine(0);
+
   }
 
   if ((data.command == CMD_INICIAR) || (data.command == CMD_CONTINUAR)) {

@@ -550,7 +550,11 @@ void receiveMessage() {
     char ch = MB_NO_CHAR;
     ch = getchar_timeout_us(0);
     if (ch != MB_NO_CHAR) {
-        printf("[DEBUG] receiveMessage: leu char 0x%02X ('%c')\n", (uint8_t)ch, (ch >= 32 && ch <= 126) ? ch : '.');
+        if ((uint8_t)ch != 0xFE) {  // ignora impressão se for 0xFE
+            printf("[DEBUG] receiveMessage: leu char 0x%02X ('%c')\n",
+                   (uint8_t)ch,
+                   (ch >= 32 && ch <= 126) ? ch : '.');
+        }
         if (_state == HUNTING_FOR_START_OF_MESSAGE) {
             if (ch == ':') {
                 idxRxBuffer = 0;

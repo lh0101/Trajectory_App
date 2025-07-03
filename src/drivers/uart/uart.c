@@ -89,8 +89,8 @@ uint8_t UARTInit(uint8_t PortNum, uint32_t baudrate) {
 
     uart_init(uart0, baudrate); // [jo:230927] Initialise UART 0
     // Set the GPIO pin mux to the UART - 0 is TX, 1 is RX
-    gpio_set_function(0, GPIO_FUNC_UART);
-    gpio_set_function(1, GPIO_FUNC_UART);
+    gpio_set_function(16, GPIO_FUNC_UART);
+    gpio_set_function(17, GPIO_FUNC_UART);
 
     irq_set_exclusive_handler(UART0_IRQ, UART0_IRQHandler);
     irq_set_enabled(UART0_IRQ, true);

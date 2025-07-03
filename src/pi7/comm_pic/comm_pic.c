@@ -27,7 +27,7 @@
 
 // === PARÂMETROS DE TEMPO ===
 #define DELAY_BYTE_MS     10    // Delay entre cada caractere enviado
-#define DELAY_ENTRE_PONTOS_MS 100  // Delay após envio completo de um ponto (ap + ah)
+#define DELAY_ENTRE_PONTOS_MS 500  // Delay após envio completo de um ponto (ap + ah)
 
 void pic_init(void){
 
@@ -38,9 +38,9 @@ void pic_init(void){
 /**
  * Envia uma string caractere por caractere via UART.
  */
-static void sendCommandByteByByte(uint8_t portNum, const char* cmd) {
+void sendCommandByteByByte(uint8_t portNum, const char* cmd) {
     for (int i = 0; cmd[i] != '\0'; i++) {
-        UARTSend(portNum, &cmd[i], 1);
+        UARTSend(portNum, (uint8_t *)&cmd[i], 1);
         sleep_ms(DELAY_BYTE_MS);
     }
 }
@@ -48,27 +48,77 @@ static void sendCommandByteByByte(uint8_t portNum, const char* cmd) {
 /**
  * Envia o comando :apXXXX; seguido de :ah; para o motor correspondente.
  */
-void pic_sendToPIC(uint8_t portNum, pic_Data data) {
-    // Seleciona o setpoint com base no canal
-    int setpoint = (portNum == 0) ? (int)data.setPoint1 : (int)data.setPoint2;
-
-    // Limita o valor do setpoint
-    if (setpoint < 0) setpoint = 0;
-    if (setpoint > 9999) setpoint = 9999;
+void pic_sendToPIC(pic_Data data) {
+    
 
     // Monta o comando :apXXXX;
     char cmd_ap[16];
-    snprintf(cmd_ap, sizeof(cmd_ap), ":ap%d;", setpoint);
-    sendCommandByteByByte(portNum, cmd_ap);
+    
+    snprintf(cmd_ap, sizeof(cmd_ap), ":ap%d;", (int)data.setPoint1);
+    sendCommandByteByByte(0, cmd_ap);
+
+    snprintf(cmd_ap, sizeof(cmd_ap), ":ap%d;", (int)data.setPoint2);
+    sendCommandByteByByte(1, cmd_ap);
 
     // Pausa entre ap e ah
-    sleep_ms(5);
+    sleep_ms(900);
 
     // Envia comando de habilitação
-    sendCommandByteByByte(portNum, ":ah;");
+    sendCommandByteByByte(0, ":ah;");
+    sendCommandByteByByte(1, ":ah;");
 
-    // Delay entre pontos consecutivos
-    sleep_ms(DELAY_ENTRE_PONTOS_MS);
+
+  //   int delay = 10;
+  //   UARTSend(1, ":", 1); // [jo:231004] alternativa linha acima sem NULL no final
+  //   sleep_ms(delay);
+  //   UARTSend(1, "a", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "p", 1);
+  //   sleep_ms(delay);
+  //   // UARTSend(portNum, "3", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "-", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "6", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "0", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "0", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, ";", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, ":", 1); // [jo:231004] alternativa linha acima sem NULL no final
+  //   sleep_ms(delay);
+  //   UARTSend(0, "a", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, "p", 1);
+  //   sleep_ms(delay);
+  //   //UARTSend(portNum, "3", 1);
+  //   //sleep_ms(delay);
+  //   UARTSend(0, "6", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, "0", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, "0", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, ";", 1);
+  //   sleep_ms(1000);
+  //   UARTSend(1, ":", 1); // [jo:231004] alternativa linha acima sem NULL no final
+  //   sleep_ms(delay);
+  //   UARTSend(1, "a", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, "h", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(1, ";", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, ":", 1); // [jo:231004] alternativa linha acima sem NULL no final
+  //   sleep_ms(delay);
+  //   UARTSend(0, "a", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, "h", 1);
+  //   sleep_ms(delay);
+  //   UARTSend(0, ";", 1);
+  // // TODO: implementar
 }
 
 extern uint8_t pic_receiveCharFromPIC(uint8_t portNum) {

@@ -59,8 +59,8 @@ void tpr_storeProgram(char* texto) {
 
     float raw_pts[2 * MAX_PROGRAM_LINES];
     for (int i = 0; i < idx; i++) {
-        raw_pts[2*i] = (tpr_program[i].x)/100;
-        raw_pts[2*i+1] = (tpr_program[i].y)/100;
+        raw_pts[2*i] = (tpr_program[i].x);
+        raw_pts[2*i+1] = (tpr_program[i].y);
     }
 
     trajetoriaTheta(raw_pts, 2 * idx); //chama funcao do polinomio que transforma lista de pontos em 2 listas de angulos, 1 para cada motor

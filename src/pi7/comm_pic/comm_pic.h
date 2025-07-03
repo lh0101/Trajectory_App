@@ -14,7 +14,8 @@ typedef struct {
 } pic_Data;
 
 void pic_init(void);
-void pic_sendToPIC(uint8_t portNum, pic_Data data);
+void pic_sendToPIC(pic_Data data);
+extern void sendCommandByteByByte(uint8_t portNum, const char* cmd);
 uint8_t pic_receiveCharFromPIC(uint8_t portNum);
 
 #endif

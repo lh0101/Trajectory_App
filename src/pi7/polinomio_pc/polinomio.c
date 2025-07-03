@@ -11,17 +11,17 @@
                      // essas funções em software; se não, escreva alternativas
 
 
-// ---- Parâmetros fixos do robô ----
-static const float motor1_pos[2] = { 0.0f,   0.285f  };
-static const float motor2_pos[2] = { 0.038f, 0.285f  };
-static const float raio_eixo     = 0.015f;
+// ---- Parâmetros fixos do robô ----  AQUI FAREMOS AS PRINCIPAIS MUDANCAS
+static  float motor1_pos[2] = { 0.19f,   0.16f  }; // colocar um no menos e redfinir onde comeca nosso sistema de coordenadas???
+static  float motor2_pos[2] = { -0.19f,  0.16f  };
+static  float raio_eixo     = 0.02f;
 
 // ---- Buffers estáticos ----
 static float waypoints[MAX_WP][2];
 static float hist_t[MAX_HIST_LEN];
 tpr_DataTheta tpr_programTheta1[MAX_HIST_LEN];
 // static float hist_phi1    [MAX_HIST_LEN];
-// // static float hist_phi1_v  [MAX_HIST_LEN];
+// // static float hist_phi1_v  -[MAX_HIST_LEN];
 // // static float hist_phi1_a  [MAX_HIST_LEN];
 // static float hist_phi2    [MAX_HIST_LEN];
 tpr_DataTheta tpr_programTheta2[MAX_HIST_LEN];
@@ -151,70 +151,210 @@ static void cinematica_direta_cabos(float L1, float L2,
     }
 }
 
+
 void trajetoriaTheta(const float raw_pts[], int raw_count) {
-    printf("[DEBUG] trajetoriaTheta: início com %d valores brutos\n", raw_count);
+    int num_raw = raw_count / 2;           // número de pares (x,y)
+    int idx     = 0;                       // índice de saída
+    const float scale = 0.001f;           
+    
+    // DEBUG: verifique o que está chegando
+    printf("DEBUG antes do loop: raw_count=%d, num_raw=%d, MAX_HIST_LEN=%d\n",
+           raw_count, num_raw, MAX_HIST_LEN);
 
-    int num_raw = raw_count/2;
-    int wp = 0;
+    // --- 1) Ponto inicial ---
+    float x0 = raw_pts[0] * scale;
+    float y0 = raw_pts[1] * scale;
 
-    for (int i = 0; i < num_raw-1 && wp < MAX_WP; i++) {
-        float x0 = raw_pts[2*i]   *0.0001f;
-        float y0 = raw_pts[2*i+1] *0.0001f;
-        float x1 = raw_pts[2*i+2] *0.0001f;
-        float y1 = raw_pts[2*i+3] *0.0001f;
+    motor1_pos[0] += x0;
+    motor1_pos[1] += y0;
+    motor2_pos[0] += x0;
+    motor2_pos[1] += y0;
 
-        printf("[DEBUG] Interpolando entre ponto %d e %d: (%.4f, %.4f) → (%.4f, %.4f)\n", i, i+1, x0, y0, x1, y1);
+    float Lant1 = hypot_approx(x0 - motor1_pos[0],
+                               y0 - motor1_pos[1]);
+    float Lant2 = hypot_approx(x0 - motor2_pos[0],
+                               y0 - motor2_pos[1]);
 
-        int start = (i==0 ? 0 : 1);
-        for (int j = start; j <= N_INTERMEDIARIOS && wp < MAX_WP; j++) {
-            float t = (float)j / N_INTERMEDIARIOS;
-            waypoints[wp][0] = x0 + (x1 - x0) * t;
-            waypoints[wp][1] = y0 + (y1 - y0) * t;
-            printf("[DEBUG]   waypoint[%d] = (%.4f, %.4f)\n", wp, waypoints[wp][0], waypoints[wp][1]);
-            wp++;
-        }
+    // --- 2) passo de tempo uniforme ---
+    float dt = (num_raw > 1) ? (TEMPO_TOTAL / (num_raw - 1)) : 0.0f;
+
+    // DEBUG: mostre dt também
+    printf("DEBUG dt calculado = %.6f\n", dt);
+
+    for (int i = 0; i < num_raw && idx < MAX_HIST_LEN; i++) {
+        // DEBUG: sinal de entrada no for
+        printf(">> entrou no for com i=%d idx=%d\n", i, idx);
+
+        if (2*i + 1 >= raw_count) {
+            printf("!!! Índice inválido raw_pts[%d] (raw_count=%d)\n", 2*i+1, raw_count);
+        break;
+        }        
+
+        // 2.1) escala do ponto bruto
+        float xcurr = raw_pts[2*i]     * scale;
+        float ycurr = raw_pts[2*i + 1] * scale;
+
+        // printf("DEBUG idx=%d: x=%.4f y=%.4f\n",
+        //        idx,
+        //        xcurr, ycurr);
+
+        // 2.2) vetores até cada motor
+        float dx1 = xcurr - motor1_pos[0];
+        float dy1 = ycurr - motor1_pos[1];
+        float dx2 = xcurr - motor2_pos[0];
+        float dy2 = ycurr - motor2_pos[1];
+
+        printf("DEBUG teste dx\n");
+
+        // 2.3) comprimentos atuais
+        float Lcurr1 = hypot_approx(dx1, dy1);
+        float Lcurr2 = hypot_approx(dx2, dy2);
+
+        printf("DEBUG teste lcurr\n");
+
+        // 2.4) variações
+        float l1 = Lcurr1 - Lant1;
+        float l2 = Lcurr2 - Lant2;
+
+        // printf("DEBUG |L1=%.4f\n", Lcurr1);
+        // printf("DEBUG |L2=%.4f \n", Lcurr2);
+        // printf("DEBUG |lant1=%.4f \n",Lant1);
+        // printf("DEBUG |lant2=%.4f\n", Lant2);
+        // printf("DEBUG |delta1=%.4f \n",l1);
+        // printf("DEBUG |delta2=%.4f\n", l2);
+
+        // 2.5) atualiza referência
+        Lant1 = Lcurr1;
+        Lant2 = Lcurr2;
+
+        // 2.6) ângulos
+        float theta1 = -100*l1 / raio_eixo;
+        float theta2 = 100*l2 / raio_eixo;
+        tpr_programTheta1[idx].theta = theta1;
+        tpr_programTheta2[idx].theta = theta2;
+
+        // DEBUG: valores internos
+        printf("DEBUG  TETHA1=%.4f TETHA2=%.4f\n", theta1, theta2);
+
+        idx++;
     }
 
-    printf("[DEBUG] Total de waypoints gerados: %d\n", wp);
-
-    int n_seg = wp - 1;
-    float t_seg = TEMPO_TOTAL / n_seg;
-    int idx = 0;
-
-    for (int i = 0; i < n_seg && idx < MAX_HIST_LEN; i++) {
-        float p0x = waypoints[i][0], p0y = waypoints[i][1];
-        float p1x = waypoints[i+1][0], p1y = waypoints[i+1][1];
-
-        float L10 = hypot_approx(p0x - motor1_pos[0], p0y - motor1_pos[1]);
-        float L20 = hypot_approx(p0x - motor2_pos[0], p0y - motor2_pos[1]);
-        float L11 = hypot_approx(p1x - motor1_pos[0], p1y - motor1_pos[1]);
-        float L21 = hypot_approx(p1x - motor2_pos[0], p1y - motor2_pos[1]);
-
-        float cL1[6], cL2[6];
-        calcular_coef_quintico(L10, L11, t_seg, cL1);
-        calcular_coef_quintico(L20, L21, t_seg, cL2);
-
-        for (int j = 0; j < PTS_PER_SEG && idx < MAX_HIST_LEN; j++) {
-            float tt = t_seg * j / (PTS_PER_SEG-1);
-            hist_t[idx] = (i * t_seg) + tt;
-            float l1, v1, a1, l2, v2, a2;
-            avaliar_quintico(cL1, tt, &l1, &v1, &a1);
-            avaliar_quintico(cL2, tt, &l2, &v2, &a2);
-            tpr_programTheta1[idx].theta = l1 / raio_eixo;
-            tpr_programTheta2[idx].theta = l2 / raio_eixo;
-
-            printf("[DEBUG]   ponto %d: t=%.3f θ1=%.3f θ2=%.3f\n", idx, hist_t[idx], tpr_programTheta1[idx].theta, tpr_programTheta2[idx].theta);
-
-            float xp, yp;
-            cinematica_direta_cabos(l1, l2, motor1_pos, motor2_pos, &xp, &yp);
-            hist_x[idx] = xp;
-            hist_y[idx] = yp;
-            idx++;
-        }
+    // DEBUG: se nunca entrou, informe
+    if (num_raw <= 0) {
+        printf("DEBUG aviso: num_raw=%d, nenhum ponto para processar!\n", num_raw);
+    } else if (idx == 0) {
+        printf("DEBUG aviso: iterator entrou mas idx permaneceu 0 (talvez MAX_HIST_LEN=0?)\n");
     }
 
-    printf("[DEBUG] trajetoriaTheta: total de pontos gerados = %d\n", idx);
+    // out_len = idx;  // se você usar
 }
+
+
+// void trajetoriaTheta(const float raw_pts[], int raw_count) {
+//     printf("[DEBUG] trajetoriaTheta: início com %d valores brutos\n", raw_count);
+
+//     int num_raw = raw_count/2;
+//     int wp = 0;
+//     float xcurr=0;
+//     float ycurr=0;
+//     float xant=0;
+//     float yant=0;
+    
+//     for (int i = 0; i < num_raw-1 && wp < MAX_WP; i++) {
+//         int currLine = tst_getCurrentLine();
+//         tpr_Data line = tpr_getLine(currLine);
+//         xcurr = raw_pts[2*i];
+//         ycurr = raw_pts[2*i + 1];
+//         float delta1xcurr = xcurr - motor1_pos[0];
+//         float delta1ycurr = ycurr - motor1_pos[1];
+//         float delta2xcurr = xcurr - motor2_pos[0];
+//         float delta2ycurr = ycurr - motor2_pos[1];
+//         float Lcurr1 = delta1xcurr*delta1xcurr + delta1ycurr*delta1ycurr;
+//         float Lcurr2 = delta2xcurr*delta2xcurr + delta2ycurr*delta2ycurr;
+//         l1 = Lcurr1 - Lant1;
+//         l2 = - (Lcurr2 - Lant2);
+//         Lant1 = Lcurr1;
+//         Lant2 = Lcurr2;
+//         tpr_programTheta1[idx].theta = l1/raio_eixo;
+//         tpr_programTheta2[idx].theta = l2/raio_eixo;
+//     }
+
+
+    // for (int i = 0; i < num_raw-1 && wp < MAX_WP; i++) {
+    //     float x0 = raw_pts[2*i]   *0.0001f;
+    //     float y0 = raw_pts[2*i+1] *0.0001f;
+    //     float x1 = raw_pts[2*i+2] *0.0001f;
+    //     float y1 = raw_pts[2*i+3] *0.0001f;
+
+    //     printf("[DEBUG] Interpolando entre ponto %d e %d: (%.4f, %.4f) → (%.4f, %.4f)\n", i, i+1, x0, y0, x1, y1);
+
+    //     int start = (i==0 ? 0 : 1);
+    //     for (int j = start; j <= N_INTERMEDIARIOS && wp < MAX_WP; j++) {
+    //         float t = (float)j / N_INTERMEDIARIOS;
+    //         waypoints[wp][0] = x0 + (x1 - x0) * t;
+    //         waypoints[wp][1] = y0 + (y1 - y0) * t;
+    //         printf("[DEBUG]   waypoint[%d] = (%.4f, %.4f)\n", wp, waypoints[wp][0], waypoints[wp][1]);
+    //         wp++;
+    //     }
+    // }
+
+    // printf("[DEBUG] Total de waypoints gerados: %d\n", wp);
+
+    // int n_seg = wp - 1;
+    // float t_seg = TEMPO_TOTAL / n_seg;
+    // int idx = 0;
+    // float Lant1 = 0.255f;
+    // float Lant2 = 0.255f;
+
+    // for (int i = 0; i < n_seg && idx < MAX_HIST_LEN; i++) {
+    //     float p0x = waypoints[i][0], p0y = waypoints[i][1];
+    //     float p1x = waypoints[i+1][0], p1y = waypoints[i+1][1];
+
+    //     float L10 = hypot_approx(p0x - motor1_pos[0], p0y - motor1_pos[1]);
+    //     float L20 = hypot_approx(p0x - motor2_pos[0], p0y - motor2_pos[1]);
+    //     float L11 = hypot_approx(p1x - motor1_pos[0], p1y - motor1_pos[1]);
+    //     float L21 = hypot_approx(p1x - motor2_pos[0], p1y - motor2_pos[1]);
+
+    //     float cL1[6], cL2[6];
+    //     calcular_coef_quintico(L10, L11, t_seg, cL1);
+    //     calcular_coef_quintico(L20, L21, t_seg, cL2);
+
+    //     for (int j = 0; j < PTS_PER_SEG && idx < MAX_HIST_LEN; j++) {
+    //         float tt = t_seg * j / (PTS_PER_SEG-1);
+    //         hist_t[idx] = (i * t_seg) + tt;
+    //         float l1, v1, a1, l2, v2, a2;
+    //         avaliar_quintico(cL1, tt, &l1, &v1, &a1);
+    //         avaliar_quintico(cL2, tt, &l2, &v2, &a2);
+    //         int sinal1 = (v1 > 0) - (v1 < 0);
+    //         int sinal2 = (v2 > 0) - (v2 < 0);
+    //         printf("v1: %d", v1);
+    //         printf("v2: %d", v2);
+    //         /////////////
+         
+    //         /////////////
+
+    //         //compara
+    //         // if (Lcurr1<Lant1) {sinal1 = -1;}
+    //         // else {sinal1 = 1;}
+    //         // if (Lcurr2<Lant2) {sinal2 = 1;}
+    //         // else {sinal2 = -1;}
+    //         // //
+           
+    //         // tpr_programTheta1[idx].theta = sinal1*l1/raio_eixo;
+    //         // tpr_programTheta2[idx].theta = sinal2*l2/raio_eixo;
+
+    //         printf("[DEBUG]   ponto %d: t=%.3f θ1=%.3f θ2=%.3f\n", idx, hist_t[idx], tpr_programTheta1[idx].theta, tpr_programTheta2[idx].theta);
+
+    //         float xp, yp;
+    //         cinematica_direta_cabos(l1, l2, motor1_pos, motor2_pos, &xp, &yp);
+    //         hist_x[idx] = xp;
+    //         hist_y[idx] = yp;
+    //         idx++;
+    //     }
+    // }
+
+    // printf("[DEBUG] trajetoriaTheta: total de pontos gerados = %d\n", idx);
+//}
 
 /**
  * tpr_getLineTheta:

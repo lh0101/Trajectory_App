@@ -112,7 +112,6 @@ def build_write_file_frame(values):
         lo = v & 0xFF
         data_values_str += byte_to_hex2(hi)
         data_values_str += byte_to_hex2(lo)
-
     # Concatenates the part of the message used for LRC calculation (without the ':')
     lrc_data_str = slave_str + fc_str + \
                    rec_len_hi_str + rec_len_lo_str + \
@@ -191,7 +190,7 @@ def on_click_enviar():
         messagebox.showwarning("Serial Error", "Serial port is not open. Cannot send program.")
         return
 
-    if not expected_x or not expected_y:
+    if expected_x.size == 0 or expected_y.size == 0:
         messagebox.showwarning("Warning", "No G-Code trajectory interpreted to send.")
         return
 
@@ -350,16 +349,39 @@ def interpretar_gcode():
         token_stream = CommonTokenStream(lexer)
         parser = GCodeParser(token_stream)
         tree = parser.program()
-        interpreter = GCodeInterpreter(circ_interpol_steps=20, linear_interpol_steps=10, name="traj")
+        interpreter = GCodeInterpreter(circ_interpol_steps=15, linear_interpol_steps=5, name="traj")
         walker = ParseTreeWalker()
         walker.walk(interpreter, tree)
 
-        expected_x = interpreter.move_sequence['x']
-        expected_y = interpreter.move_sequence['y']
+        expected_x1 = interpreter.move_sequence['x']
+        expected_y1 = interpreter.move_sequence['y']
         expected_z = [0] * len(expected_x) 
 
+        minx = 0
+        miny = 0
+        if min(expected_x1) < 0:
+            minx = min(expected_x1) 
+        if min(expected_y1) < 0:
+            miny = min(expected_y1) 
+        
+        from itertools import groupby
+        import numpy as np
+
+        #supondo que xs e ys sejam seus arrays originais
+        pairs = list(zip(expected_x1, expected_y1))
+
+        # groupby só agrupa iguais em sequência
+        unique_pairs = [key for key, _ in groupby(pairs)]
+
+        # re-separa em dois arrays depois de filtrar:
+        keysx, keysy = np.array([p[0] for p in unique_pairs]), \
+                                np.array([p[1] for p in unique_pairs])
+
+        expected_x = np.array(keysx) - minx 
+        expected_y = np.array(keysy) - miny 
+
         plot_expected_trajectory()
-        messagebox.showinfo("Success", "G-Code interpreted successfully!")
+        messagebox.showinfo("Success", f"G-Code interpreted successfully!\nPadx: {min(expected_x1)}; Pady: {min(expected_y1)}")
     except Exception as e:
         messagebox.showerror("Interpretation Error", str(e))
 
@@ -377,7 +399,7 @@ def serial_reader_thread():
             line = ser.readline().decode('ascii').strip()
             
             # Condição para imprimir no terminal
-            if line and not line.startswith("[DEBUG] receiveMessage: leu char 0xFE ('.')"):
+            if line and not line.startswith("[DEBUG] receiveMessage: leu char 0xFE"):
                 print(f"{line}") 
                 root.after(0, lambda msg=line: log_output.insert(tk.END, msg + "\n"))
             # Condição para exibir na interface (APENAS mensagens [PICO])
