@@ -36,7 +36,6 @@
 #include "pi7/trj_control/trj_control.h"
 #include "pi7/trj_program/trj_program.h"
 #include "pi7/trj_state/trj_state.h"
-#include "pi7/polinomio_pc/polinomio.h"
 
 // PI7 DEFINES
 #define CONTROL_Q_SIZE 1 // queue sizes
